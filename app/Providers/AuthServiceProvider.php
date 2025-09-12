@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Providers;
+
+use App\Services\Auth\AuthService;
+use App\Services\Auth\Interfaces\AuthServiceInterface;
+use App\Services\JWT\JWTService;
+use Illuminate\Support\ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->bind(AuthServiceInterface::class, AuthService::class);
+        $this->app->bind(JWTService::class, function () {
+            return new JWTService();
+        });
+    }
+
+    public function boot(): void
+    {
+        //
+    }
+}
