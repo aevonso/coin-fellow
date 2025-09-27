@@ -5,6 +5,7 @@ namespace App\Services\JWT;
 use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
+use Illuminate\Support\Str;
 
 class JWTService
 {
