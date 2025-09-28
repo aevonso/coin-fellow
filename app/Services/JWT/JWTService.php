@@ -34,7 +34,7 @@ class JWTService
                 ->where('refresh_token_expires_at', '>', now())
                 ->firstOrFail();
 
-            JWTAuth::invalidate(true);
+            JWTAuth::invalidate(JWTAuth::getToken());
 
             return $this->generateTokens($user);
         } catch (JWTException $e) {
@@ -49,6 +49,5 @@ class JWTService
             'refresh_token_expires_at' => null,
         ]);
 
-        JWTAuth::invalidate(true);
     }
 }

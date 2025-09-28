@@ -9,6 +9,7 @@ class TelegramAuthDTO extends Data {
         public ?string $username = null,
         public ?string $first_name = null,
         public ?string $last_name = null,
-        public ?string $language_code = null
+        public ?string $language_code = null,
+        public ?string $avatar_url = null
     ) {}
 }

@@ -68,6 +68,16 @@ class User extends Authenticatable implements JWTSubject
         return $this->getKey();
     }
 
+    public function hasActiveSubscription(): bool
+    {
+        if ($this->relationLoaded('subscription') && $this->subscription) {
+            return $this->subscription->status === 'active' && 
+                   $this->subscription->ends_at->isFuture();
+        }
+        
+        return $this->premium_until && $this->premium_until->isFuture();
+    }
+
     public function getJWTCustomClaims()
     {
         return [

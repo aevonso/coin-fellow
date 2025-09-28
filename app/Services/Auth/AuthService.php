@@ -10,6 +10,7 @@ use App\Services\Auth\DTO\TelegramAuthDTO;
 use App\Services\Auth\Interfaces\AuthServiceInterface;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthService implements AuthServiceInterface
 {
@@ -28,7 +29,9 @@ class AuthService implements AuthServiceInterface
             'username' => $dto->username,
         ]);
 
-        return $this->jwtService->generateTokens($user);
+        $tokens =  $this->jwtService->generateTokens($user);
+
+        return array_merge($tokens, ['user' => $user]);
     }
 
     public function login(LoginDTO $dto): array
@@ -45,7 +48,9 @@ class AuthService implements AuthServiceInterface
 
         $user->update(['last_login_at' => now()]);
 
-        return $this->jwtService->generateTokens($user);
+        $tokens = $this->jwtService->generateTokens($user);
+
+        return array_merge($tokens, ['user' => $user]);
     }
 
     public function telegramAuth(TelegramAuthDTO $dto): array
@@ -64,10 +69,12 @@ class AuthService implements AuthServiceInterface
 
         $user->update(['last_login_at' => now()]);
 
-        return $this->jwtService->generateTokens($user);
+        $tokens = $this->jwtService->generateTokens($user);
+
+        return array_merge($tokens, ['user' => $user]);
     }
 
-    public function refreshToken(): array
+  public function refreshToken(): array
     {
         $refreshToken = request()->input('refresh_token');
         return $this->jwtService->refreshTokens($refreshToken);
@@ -75,11 +82,26 @@ class AuthService implements AuthServiceInterface
 
     public function logout(): void
     {
-        $this->jwtService->invalidateTokens(auth()->user());
+        $token = JWTAuth::getToken();
+        if ($token) {
+            JWTAuth::invalidate($token);
+            
+            $user = auth()->user();
+            if ($user) {
+                $user->update([
+                    'refresh_token' => null,
+                    'refresh_token_expires_at' => null,
+                ]);
+            }
+        }
     }
 
     public function getAuthenticatedUser(): User
     {
-        return auth()->user();
+        $user = auth()->user();
+        if (!$user) {
+            throw new \Exception('User not authenticated');
+        }
+        return $user;
     }
 }
