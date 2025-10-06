@@ -111,7 +111,7 @@ class GroupService implements GroupServiceInterface {
         // Проверяем права (только owner/admin могут удалять)
         $this->checkUserPermissions($user, $group, ['owner', 'admin']);
 
-        // Нельзя удалить самого себя
+        //нельзя удалить самого себя
         if ($user->id === $userId) {
             throw ValidationException::withMessages([
                 'user' => ['You cannot remove yourself from the group'],
