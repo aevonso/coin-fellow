@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GroupController;
 use Illuminate\Support\Facades\Route;
+
 
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
@@ -9,11 +11,12 @@ Route::prefix('auth')->group(function () {
     Route::post('telegram', [AuthController::class, 'telegramAuth']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     
-    Route::middleware('auth:api')->group(function () {
+    Route::middleware('auth.jwt')->group(function () { 
         Route::get('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
     });
 });
+
 
 Route::middleware('auth.jwt')->prefix('groups')->group(function () {
     Route::get('/', [GroupController::class, 'index']);

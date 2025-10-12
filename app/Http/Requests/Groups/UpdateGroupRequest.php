@@ -4,7 +4,7 @@ namespace App\Http\Requests\Groups;
 
 use App\Http\Requests\BaseRequest;
 
-class UpdateGroupsRequest extends BaseRequest {
+class UpdateGroupRequest extends BaseRequest {
 public function authorize(): bool {
     return true;
 }
