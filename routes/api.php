@@ -14,3 +14,15 @@ Route::prefix('auth')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
     });
 });
+
+Route::middleware('auth.jwt')->prefix('groups')->group(function () {
+    Route::get('/', [GroupController::class, 'index']);
+    Route::post('/', [GroupController::class, 'store']);
+    Route::get('{groupId}', [GroupController::class, 'show']);
+    Route::put('{groupId}', [GroupController::class, 'update']);
+    Route::delete('{groupId}', [GroupController::class, 'destroy']);
+    
+    Route::post('{groupId}/invite', [GroupController::class, 'invite']);
+    Route::delete('{groupId}/members/{userId}', [GroupController::class, 'removeUser']);
+    Route::post('{groupId}/leave', [GroupController::class, 'leave']);
+});

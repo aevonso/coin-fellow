@@ -91,4 +91,20 @@ class User extends Authenticatable implements JWTSubject
     {
         return $query->where('telegram_user_id', $telegramId);
     }
+
+    public function groups(): BelongsToMany {
+        return $this->belongsToMany(Group::class, 'group_user')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    public function expenses(): HasMany {
+        return $this->hasMany(Expense::class, 'payer_id');
+    }
+
+    public function participatingExpenses(): BelongsToMany {
+        return $this->belongsToMany(Expense::class, 'expense_user')
+            ->withPivot(['share', 'percentage'])
+            ->withTimestamp();
+    }
 }
