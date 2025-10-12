@@ -5,7 +5,7 @@ namespace App\Providers;
 use App\Services\Auth\AuthService;
 use App\Services\Groups\GroupService;
 use App\Services\Auth\Interfaces\AuthServiceInterface;
-use App\Services\Group\Interfaces\GroupServiceInterface;
+use App\Services\Groups\Interfaces\GroupServiceInterface;
 use App\Services\JWT\JWTService;
 use Illuminate\Support\ServiceProvider;
 

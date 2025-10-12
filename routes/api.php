@@ -4,21 +4,26 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GroupController;
 use Illuminate\Support\Facades\Route;
 
+// Test route without middleware
+Route::get('/test', function () {
+    return response()->json(['message' => 'API is working!']);
+});
 
+// Auth routes
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
     Route::post('telegram', [AuthController::class, 'telegramAuth']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     
-    Route::middleware('auth.jwt')->group(function () { 
+    Route::middleware('jwt.auth')->group(function () { // ← используем jwt.auth
         Route::get('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
     });
 });
 
-
-Route::middleware('auth.jwt')->prefix('groups')->group(function () {
+// Groups routes
+Route::middleware('jwt.auth')->prefix('groups')->group(function () { // ← используем jwt.auth
     Route::get('/', [GroupController::class, 'index']);
     Route::post('/', [GroupController::class, 'store']);
     Route::get('{groupId}', [GroupController::class, 'show']);
