@@ -13,10 +13,10 @@ interface GroupServiceInterface
 {
     public function getUserGroups(User $user): LengthAwarePaginator;
     public function createGroup(User $user, CreateGroupDTO $dto): Group;
-    public function getGroup(User $user, string $groupID): Group;
+    public function getGroup(User $user, string $groupId): Group; 
     public function updateGroup(User $user, string $groupId, UpdateGroupDTO $dto): Group;
     public function deleteGroup(User $user, string $groupId): void;
-    public function inviteUser(User $user, string $groupID, string $userId): void;
+    public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): void; 
     public function removeUser(User $user, string $groupId, string $userId): void;
     public function leaveGroup(User $user, string $groupId): void;
 }
