@@ -17,13 +17,11 @@ class ExpenseResource extends JsonResource
             'amount_per_participant' => $this->when($this->participants_count, 
                 (float) $this->getAmountPerParticipant()),
             
-            // Relationships
             'payer' => new UserResource($this->whenLoaded('payer')),
             'category' => new CategoryResource($this->whenLoaded('category')),
             'participants' => UserResource::collection($this->whenLoaded('participants')),
             'participants_count' => $this->whenCounted('participants', $this->participants_count),
 
-            // Timestamps
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
