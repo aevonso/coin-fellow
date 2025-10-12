@@ -6,7 +6,7 @@ use App\Http\Requests\Groups\CreateGroupRequest;
 use App\Http\Requests\Groups\UpdateGroupRequest;
 use App\Http\Requests\Groups\InviteUserRequest;
 use App\Http\Resources\GroupResource;
-use App\Http\Resources\Collection\GroupCollection;
+use App\Http\Resources\Collections\GroupCollection;
 use App\Services\Groups\Interfaces\GroupServiceInterface;
 use App\Services\Groups\DTO\CreateGroupDTO;
 use App\Services\Groups\DTO\UpdateGroupDTO;
