@@ -32,3 +32,15 @@ Route::middleware('jwt.auth')->prefix('groups')->group(function () {
     Route::delete('{groupId}/members/{userId}', [GroupController::class, 'removeUser']);
     Route::post('{groupId}/leave', [GroupController::class, 'leave']);
 });
+
+//expenses routes
+Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
+    Route::get('expenses', [ExpenseController::class, 'index']);
+    Route::post('expenses', [ExpenseController::class, 'store']);
+    Route::get('expenses/{expenseId}', [ExpenseController::class, 'show']);
+    Route::put('expenses/{expenseId}', [ExpenseController::class, 'update']);
+    Route::delete('expenses/{expenseId}', [ExpenseController::class, 'destroy']);
+});
+
+//user expenses (из всех групп)
+Route::middleware('jwt.auth')->get('/user/expenses', [ExpenseController::class, 'userExpenses']);
