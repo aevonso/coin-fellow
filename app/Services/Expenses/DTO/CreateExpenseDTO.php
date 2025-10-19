@@ -4,7 +4,7 @@ namespace App\Services\Expenses\DTO;
 
 use Spatie\LaravelData\Data;
 
-class CreateExpensesDTO extends Data {
+class CreateExpenseDTO extends Data {
     public function __construct (
         public string $description,
         public float $amount,

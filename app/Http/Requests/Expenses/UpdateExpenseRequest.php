@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Http\Request\Expenses;
+namespace App\Http\Requests\Expenses;
 
-use App\Http\Request\BaseRequest;
+use App\Http\Requests\BaseRequest;
 
 class UpdateExpenseRequest extends BaseRequest 
 {

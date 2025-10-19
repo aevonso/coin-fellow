@@ -36,7 +36,7 @@ class ExpenseController extends Controller
     {
         $user = $request->user();
         $validated = $request->validated();
-        $validated['groupId'] = $groupId; // Добавляем groupId из URL
+        $validated['groupId'] = $groupId;
         
         $dto = CreateExpenseDTO::from($validated);
         $expense = $this->expenseService->createExpense($user, $dto);
