@@ -9,14 +9,14 @@ use App\Services\Expenses\DTO\CreateExpenseDTO;
 use App\Services\Expenses\DTO\UpdateExpenseDTO;
 use App\Services\Expenses\Interfaces\ExpenseServiceInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Validator\ValidatorException;
+use Illuminate\Validation\ValidationException;
 
 class ExpenseService implements ExpenseServiceInterface {
     public function getGroupExpenses(User $user, string $groupId): LengthAwarePaginator {
         $group = Group::findOrFail($groupId); 
 
         if(!$group->users->contains($user->id)) {
-            throw ValidatorException::withMessages([
+            throw ValidationException::withMessages([
                 'group' => ['Вы не являетесь участником этой группы'],
             ]);
         }
@@ -31,8 +31,8 @@ class ExpenseService implements ExpenseServiceInterface {
     public function createExpense(User $user, CreateExpenseDTO $dto): Expense {
         $group = Group::findOrFail($dto->groupId);
 
-         if(!$group->users->contains($user->id)) {
-            throw ValidatorException::withMessages([
+        if(!$group->users->contains($user->id)) {
+            throw ValidationException::withMessages([
                 'group' => ['Вы не являетесь участником этой группы'],
             ]);
         }
@@ -46,45 +46,41 @@ class ExpenseService implements ExpenseServiceInterface {
             'date' => $dto->date,
         ]);
 
-        $this->handleParticipants($expense, $dto->participants);
+        $this->handleParticipants($expense, $dto->participants, $group);
         
         return $expense->load(['payer', 'category' , 'participants']);
     }
     
-    private function handleParticipants(Expense $expense, ?array $participants): void{
-     
-        if (!$expense->relationLoaded('group')) {
-        $expense->load('group.users');
-    }
+    private function handleParticipants(Expense $expense, ?array $participants, Group $group): void
+    {
+        if ($participants === null) {
+            $participants = $group->users->pluck('id')->toArray();
+        }
 
-    if ($participants === null) {
-        $participants = $expense->group->users->pluck('id')->toArray();
-    }
+        if (empty($participants)) {
+            throw ValidationException::withMessages([
+                'participants' => ['No participants found for this expense'],
+            ]);
+        }
 
-    if (empty($participants)) {
-        throw ValidationException::withMessages([
-            'participants' => ['No participants found for this expense'],
-        ]);
-    }
+        $expense->participants()->detach();
 
-    $expense->participants()->detach();
-
-    $share = $expense->amount / count($participants);
-    
-    foreach ($participants as $participantId) {
-        $expense->participants()->attach($participantId, [
-            'share' => $share
-        ]);
+        $share = $expense->amount / count($participants);
+        
+        foreach ($participants as $participantId) {
+            $expense->participants()->attach($participantId, [
+                'share' => $share
+            ]);
+        }
     }
-}
 
     public function getExpense(User $user, string $expenseId): Expense
     {
         $expense = Expense::with(['payer', 'category', 'participants', 'group.users'])
             ->findOrFail($expenseId);
 
-      if(!$expense->group->users->contains($user->id)) {
-            throw ValidatorException::withMessages([
+        if(!$expense->group->users->contains($user->id)) {
+            throw ValidationException::withMessages([
                 'group' => ['Вы не являетесь участником этой группы'],
             ]);
         }
@@ -114,7 +110,7 @@ class ExpenseService implements ExpenseServiceInterface {
         $expense->save();
 
         if ($dto->participants !== null) {
-            $this->handleParticipants($expense, $dto->participants);
+            $this->handleParticipants($expense, $dto->participants, $expense->group);
         }
 
         return $expense->load(['payer', 'category', 'participants']);
@@ -138,19 +134,6 @@ class ExpenseService implements ExpenseServiceInterface {
             ->with(['group', 'category', 'payer'])
             ->orderBy('date', 'desc')
             ->paginate(20);
-    }
-
-
-
-    private function splitEqually(Expense $expense, array $participants): void
-    {
-        $share = $expense->amount / count($participants);
-        
-        foreach ($participants as $participantId) {
-            $expense->participants()->attach($participantId, [
-                'share' => $share
-            ]);
-        }
     }
 
     private function checkExpensePermissions(User $user, Expense $expense): void
