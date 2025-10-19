@@ -21,7 +21,7 @@ class Expense extends Model //модель для расчетов
     ];
 
     protected $casts = [
-        'amount' => 'decimal',
+        'amount' => 'decimal:2', //исправил на decimal:2
         'date' => 'date',
     ];
 
@@ -53,11 +53,11 @@ class Expense extends Model //модель для расчетов
         return $query->where('group_id', $groupId);
     }
 
-    public function scopeForUser($query, $userId) {
-        return $query->where('payer_id', $user_id)
-            ->orWhereHas('participants', function($q) use ($userId) {
-                $q->where('user_id', $userId);
-            });
+   public function scopeForUser($query, $userId) {
+    return $query->where('payer_id', $userId) 
+        ->orWhereHas('participants', function($q) use ($userId) {
+            $q->where('user_id', $userId);
+        });
     }
 
     public function getAmountPerParticipant(): float {
