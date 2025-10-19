@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Expenses\CreateExpenseRequest;
 use App\Http\Requests\Expenses\UpdateExpenseRequest;
 use App\Http\Resources\ExpenseResource;
-use App\Http\Resources\ExpenseCollection;
+use App\Http\Resources\Collections\ExpenseCollection;
 use App\Services\Expenses\Interfaces\ExpenseServiceInterface;
 use App\Services\Expenses\DTO\CreateExpenseDTO;
 use App\Services\Expenses\DTO\UpdateExpenseDTO;

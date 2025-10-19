@@ -60,7 +60,7 @@ class Group extends Model
     {
         return $this->users()
             ->where('user_id', $user->id)
-            ->whereIn('pivot_role', ['owner', 'admin'])
+            ->whereIn('group_user.role', ['owner', 'admin'])
             ->exists();
     }
 
