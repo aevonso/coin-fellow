@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Request\Expenses;
+namespace App\Http\Requests\Expenses;
 
-use App\Http\Request\BaseRequest;
+use App\Http\Requests\BaseRequest;
 
-class CreateExpensesRequest extends BaseRequest 
+class CreateExpenseRequest extends BaseRequest 
 {
     public function authorize(): bool {
         return true;
@@ -15,7 +15,6 @@ class CreateExpensesRequest extends BaseRequest
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'date' => 'required|date',
-            'groupId' => 'required|exists|group,id',
             'categoryId' => 'nullable|exists:categories,id',
             'participants' => 'nullable|array',
             'participants.*' => 'exists:users,id',
