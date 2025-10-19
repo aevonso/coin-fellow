@@ -9,15 +9,11 @@
 
 *Умное приложение для учета общих расходов в Telegram*
 
-
-
 </div>
 
 ---
 
 ## 🌟 **About The Project**
-
-
 
 CoinFellow - это современное Telegram Mini App для легкого учета общих расходов с друзьями, семьей или коллегами. Больше никаких споров "кто кому должен"!
 
@@ -72,7 +68,82 @@ CoinFellow - это современное Telegram Mini App для легког
 
 ### **Local Development**
 
-1. **Clone repository**
+#### 1. **Backend Setup (Laravel)**
+
 ```bash
+# Клонируем репозиторий
 git clone https://github.com/your-username/coinfellow.git
-cd coinfellow
+cd coinfellow/backend
+
+# Устанавливаем PHP зависимости
+composer install
+
+# Копируем файл окружения и настраиваем
+cp .env.example .env
+
+# Генерируем ключ приложения
+php artisan key:generate
+
+# Создаем символическую ссылку для storage
+php artisan storage:link
+```
+
+**Настройка .env файла:**
+```env
+APP_NAME=CoinFellow
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=coinfellow
+DB_USERNAME=root
+DB_PASSWORD=
+
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_SECRET_TOKEN=your_webhook_secret
+
+JWT_SECRET=your_jwt_secret_here
+```
+
+**Запуск миграций и сидов:**
+```bash
+# Запускаем миграции для создания таблиц в базе данных
+php artisan migrate
+
+# (Опционально) Заполняем базу тестовыми данными
+php artisan db:seed
+
+# Или запускаем миграции и сиды вместе
+php artisan migrate --seed
+```
+
+**Запуск сервера:**
+```bash
+# Запускаем development сервер
+php artisan serve
+```
+
+
+
+
+
+
+## 📝 **Дополнительные команды**
+
+```bash
+# Генерация JWT секрета
+php artisan jwt:secret
+
+# Очистка кэша
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+
+# Запуск очередей
+php artisan queue:work
+```
+
+Приложение будет доступно по адресу: `http://localhost:8000`
