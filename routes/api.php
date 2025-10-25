@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\BalanceController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -45,3 +46,15 @@ Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
 
 //user expenses (из всех групп)
 Route::middleware('jwt.auth')->get('/user/expenses', [ExpenseController::class, 'userExpenses']);
+
+
+//balances
+
+Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
+    Route::get('balances', [BalanceController::class, 'getGroupBalances']);
+    Route::get('balances/simplified', [BalanceController::class, 'getSimplifiedDebts']);
+    Route::get('balances/my', [BalanceController::class, 'getUserBalances']);
+    Route::get('balances/summary', [BalanceController::class, 'getBalanceSummary']);
+    Route::post('balances/recalculate', [BalanceController::class, 'recalculateBalances']);
+    Route::post('balances/settle', [BalanceController::class, 'settleDebt']);
+});
