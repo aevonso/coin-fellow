@@ -5,6 +5,7 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\BalanceController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CategoryController;
 
 
 
@@ -57,4 +58,21 @@ Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
     Route::get('balances/summary', [BalanceController::class, 'getBalanceSummary']);
     Route::post('balances/recalculate', [BalanceController::class, 'recalculateBalances']);
     Route::post('balances/settle', [BalanceController::class, 'settleDebt']);
+});
+
+
+//categories
+
+Route::middleware('jwt.auth')->prefix('categories')->group(function () {
+    Route::get('/', [CategoryController::class, 'index']);
+    Route::get('/all', [CategoryController::class, 'listAll']);
+    Route::post('/', [CategoryController::class, 'store']);
+    Route::get('/user-statistics', [CategoryController::class, 'userStatistics']);
+    
+    Route::prefix('{categoryId}')->group(function () {
+        Route::get('/', [CategoryController::class, 'show']);
+        Route::put('/', [CategoryController::class, 'update']);
+        Route::delete('/', [CategoryController::class, 'destroy']);
+        Route::get('/statistics', [CategoryController::class, 'statistics']);
+    });
 });
