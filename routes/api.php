@@ -54,10 +54,10 @@ Route::middleware('jwt.auth')->get('/user/expenses', [ExpenseController::class, 
 Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
     Route::get('balances', [BalanceController::class, 'getGroupBalances']);
     Route::get('balances/simplified', [BalanceController::class, 'getSimplifiedDebts']);
-    Route::get('balances/my', [BalanceController::class, 'getUserBalances']);
     Route::get('balances/summary', [BalanceController::class, 'getBalanceSummary']);
+    Route::get('balances/my-debts', [BalanceController::class, 'getMyDebts']);
+    Route::get('balances/debts-to-me', [BalanceController::class, 'getDebtsToMe']);
     Route::post('balances/recalculate', [BalanceController::class, 'recalculateBalances']);
-    Route::post('balances/settle', [BalanceController::class, 'settleDebt']);
 });
 
 
