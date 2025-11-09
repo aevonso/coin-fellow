@@ -6,7 +6,7 @@
 ![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)
 ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=JSON%20web%20tokens&logoColor=white)
 
-Приложение для учета общих расходов в Telegram*
+Приложение для учета общих расходов в Telegram
 
 </div>
 
