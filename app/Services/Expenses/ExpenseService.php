@@ -5,13 +5,19 @@ namespace App\Services\Expenses;
 use App\Models\Expense;
 use App\Models\User;
 use App\Models\Group;
+use App\Services\Balances\Interfaces\BalanceServiceInterface;
 use App\Services\Expenses\DTO\CreateExpenseDTO;
 use App\Services\Expenses\DTO\UpdateExpenseDTO;
 use App\Services\Expenses\Interfaces\ExpenseServiceInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ExpenseService implements ExpenseServiceInterface {
+
+    public function __construct (
+        private BalanceServiceInterface $balanceService
+    ) {}
     public function getGroupExpenses(User $user, string $groupId): LengthAwarePaginator {
         $group = Group::findOrFail($groupId); 
 
@@ -36,19 +42,23 @@ class ExpenseService implements ExpenseServiceInterface {
                 'group' => ['Вы не являетесь участником этой группы'],
             ]);
         }
+        return DB::transaction(function() use ($user, $dto, $group) {
+            $expense = Expense::create([
+                'group_id' => $dto->groupId,
+                'payer_id' => $user->id,
+                'category_id' => $dto->categoryId,
+                'description' => $dto->description,
+                'amount' => $dto->amount,
+                'date' => $dto->date,
+            ]);
 
-        $expense = Expense::create([
-            'group_id' => $dto->groupId,
-            'payer_id' => $user->id,
-            'category_id' => $dto->categoryId,
-            'description' => $dto->description,
-            'amount' => $dto->amount,
-            'date' => $dto->date,
-        ]);
+            $this->handleParticipants($expense, $dto->participants, $group);
+            
+            //Автоматический расчет балансов после создания расхода
+            $this->balanceService->calculateBalanceForGroup($dto->groupId);
 
-        $this->handleParticipants($expense, $dto->participants, $group);
-        
-        return $expense->load(['payer', 'category' , 'participants']);
+            return $expense->load(['payer', 'category' , 'participants']);
+        });  
     }
     
     private function handleParticipants(Expense $expense, ?array $participants, Group $group): void
@@ -94,26 +104,31 @@ class ExpenseService implements ExpenseServiceInterface {
 
         $this->checkExpensePermissions($user, $expense);
 
-        if ($dto->description) {
-            $expense->description = $dto->description;
-        }
-        if ($dto->amount) {
-            $expense->amount = $dto->amount;
-        }
-        if ($dto->date) {
-            $expense->date = $dto->date;
-        }
-        if ($dto->categoryId !== null) {
-            $expense->category_id = $dto->categoryId;
-        }
+        return DB::transaction(function () use ($expense, $dto) {
+            if ($dto->description) {
+                $expense->description = $dto->description;
+            }
+            if ($dto->amount) {
+                $expense->amount = $dto->amount;
+            }
+            if ($dto->date) {
+                $expense->date = $dto->date;
+            }
+            if ($dto->categoryId !== null) {
+                $expense->category_id = $dto->categoryId;
+            }
 
-        $expense->save();
+            $expense->save();
 
-        if ($dto->participants !== null) {
-            $this->handleParticipants($expense, $dto->participants, $expense->group);
-        }
+            if ($dto->participants !== null) {
+                $this->handleParticipants($expense, $dto->participants, $expense->group);
+            }
 
-        return $expense->load(['payer', 'category', 'participants']);
+            $this->balanceService->calculateBalancesForGroup($expense->group_id);
+            return $expense->load(['payer', 'category', 'participants']);
+        });
+
+        
     }
 
     public function deleteExpense(User $user, string $expenseId): void
@@ -122,7 +137,11 @@ class ExpenseService implements ExpenseServiceInterface {
 
         $this->checkExpensePermissions($user, $expense);
 
-        $expense->delete();
+        DB::transaction(function () use ($expense, $groupId){
+            $expense->delete();
+
+            $this->balanceService->calculateBalancesForGroup($groupId);
+        });
     }
 
     public function getUserExpenses(User $user): LengthAwarePaginator

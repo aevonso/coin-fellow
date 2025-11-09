@@ -115,4 +115,44 @@ class BalanceController extends Controller
         
         return $group;
     }
+
+    /**
+     * Получить мои долги (я должен)
+     */
+    public function getMyDebts(Request $request, string $groupId): JsonResponse
+    {
+        $user = $request->user();
+        $this->checkGroupMembership($user, $groupId);
+        
+        $balances = $this->balanceService->getUserBalancesInGroup($groupId, $user->id);
+        $debts = $balances->filter(function ($balance) use ($user) {
+            return $balance->from_user_id === $user->id;
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => BalanceResource::collection($debts),
+            'message' => 'My debts retrieved successfully'
+        ]);
+    }
+
+    /**
+     * Получить долги мне (мне должны)
+     */
+    public function getDebtsToMe(Request $request, string $groupId): JsonResponse
+    {
+        $user = $request->user();
+        $this->checkGroupMembership($user, $groupId);
+        
+        $balances = $this->balanceService->getUserBalancesInGroup($groupId, $user->id);
+        $credits = $balances->filter(function ($balance) use ($user) {
+            return $balance->to_user_id === $user->id;
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => BalanceResource::collection($credits),
+            'message' => 'Debts to me retrieved successfully'
+        ]);
+    }
 }
