@@ -16,31 +16,37 @@ use Illuminate\Validation\ValidationException;
 
 class BalanceService implements BalanceServiceInterface 
 {
-    public function calculateBalancesForGroup(string $groupId): void {
+    public function calculateBalancesForGroup(string $groupId): void
+    {
         $group = Group::with(['expenses.participants', 'users'])->findOrFail($groupId);
-
-        DB::transaction(function () use ($group){
+        
+        DB::transaction(function () use ($group) {
+            
             Balance::forGroup($group->id)->delete();
-
-            foreach($group->expenses as $expense) {
+            
+            
+            foreach ($group->expenses as $expense) {
                 $this->calculateExpenseBalances($expense);
             }
-
+            
             $this->optimizeBalances($group->id);
         });
     }
 
-    private function calculateExpenseBalances(Expense $expense): void {
+    private function calculateExpenseBalances(Expense $expense): void
+    {
         $payerId = $expense->payer_id;
         $totalAmount = $expense->amount;
         $participants = $expense->participants;
-
-        if($participants->isEmpty()) return;
-
+        
+        if ($participants->isEmpty()) {
+            return;
+        }
+        
         $sharePerParticipant = $totalAmount / $participants->count();
-
-        foreach($participants as $participant) {
-            if($participant->id !== $payerId) {
+        
+        foreach ($participants as $participant) {
+            if ($participant->id !== $payerId) {
                 $this->updateBalance(
                     $expense->group_id,
                     $participant->id,
@@ -51,8 +57,9 @@ class BalanceService implements BalanceServiceInterface
         }
     }
 
-    private function updateBalance(string $groupId, string $fromUserId, string $toUserId, float $amount): void {
-        if($amount <= 0) {
+   private function updateBalance(string $groupId, string $fromUserId, string $toUserId, float $amount): void
+    {
+        if ($amount <= 0) {
             return;
         }
 
@@ -60,32 +67,42 @@ class BalanceService implements BalanceServiceInterface
             ->betweenUsers($toUserId, $fromUserId)
             ->first();
 
-        if($reverseBalance && $reverseBalance->amount > 0) {
-            if($reverseBalance->amount >= $amount) {
-                $reverseBalance->amount -=$amount;
+        if ($reverseBalance && $reverseBalance->amount > 0) {
+            if ($reverseBalance->amount >= $amount) {
+                $reverseBalance->amount -= $amount;
                 $reverseBalance->save();
-
-                if($reverseBalance->amount ==0) {
+                
+                
+                if ($reverseBalance->amount == 0) {
                     $reverseBalance->delete();
                 }
                 return;
             } else {
-                $amount -=$reverseBalance->amount;
+                $remainingAmount = $amount - $reverseBalance->amount;
                 $reverseBalance->delete();
+                
+                $this->createOrUpdateBalance($groupId, $fromUserId, $toUserId, $remainingAmount);
+                return;
             }
         }
+
+        $this->createOrUpdateBalance($groupId, $fromUserId, $toUserId, $amount);
+    }
+
+     private function createOrUpdateBalance(string $groupId, string $fromUserId, string $toUserId, float $amount): void
+    {
         $balance = Balance::forGroup($groupId)
-            ->betweenUsers($toUserId, $fromUserId)
+            ->betweenUsers($fromUserId, $toUserId)
             ->first();
 
-        if($balance) {
+        if ($balance) {
             $balance->amount += $amount;
             $balance->save();
         } else {
             Balance::create([
                 'group_id' => $groupId,
                 'from_user_id' => $fromUserId,
-                'to_user_id' => $to_user_id,
+                'to_user_id' => $toUserId,
                 'amount' => $amount
             ]);
         }
@@ -108,16 +125,10 @@ class BalanceService implements BalanceServiceInterface
             ->get();
     }
 
-     public function getSimplifiedDebts(string $groupId): Collection
+    public function getSimplifiedDebts(string $groupId): Collection
     {
         $balances = $this->getGroupBalances($groupId);
-        return $balances->map(function ($balance) {
-            return [
-                'from_user' => $balance->fromUser,
-                'to_user' => $balance->toUser,
-                'amount' => (float) $balance->amount
-            ];
-        });
+        return $this->optimizeDebts($balances);
     }
 
      public function recalculateBalances(RecalculateBalancesDTO $dto): void
@@ -147,18 +158,45 @@ class BalanceService implements BalanceServiceInterface
         });
     }
 
-    public function getBalanceSummary(string $groupId, string $userId): array
+       private function optimizeDebts(Collection $balances): Collection
+    {
+        $debts = $balances->map(function ($balance) {
+            return [
+                'from_user_id' => $balance->from_user_id,
+                'to_user_id' => $balance->to_user_id,
+                'amount' => (float) $balance->amount,
+                'from_user' => $balance->fromUser,
+                'to_user' => $balance->toUser
+            ];
+        });
+
+        // TODO: Реализовать алгоритм минимизации транзакций
+        // Пока возвращаем прямые долги без оптимизации
+        return collect($debts);
+    }
+
+     public function getBalanceSummary(string $groupId, string $userId): array
     {
         $balances = $this->getUserBalancesInGroup($groupId, $userId);
         
         $totalOwed = 0;
         $totalOwedToYou = 0;
+        $debts = [];
+        $credits = [];
 
         foreach ($balances as $balance) {
             if ($balance->from_user_id === $userId) {
                 $totalOwed += $balance->amount;
+                $debts[] = [
+                    'to_user' => $balance->toUser,
+                    'amount' => (float) $balance->amount
+                ];
             } else {
                 $totalOwedToYou += $balance->amount;
+                $credits[] = [
+                    'from_user' => $balance->fromUser,
+                    'amount' => (float) $balance->amount
+                ];
             }
         }
 
@@ -166,6 +204,8 @@ class BalanceService implements BalanceServiceInterface
             'total_owed' => $totalOwed,
             'total_owed_to_you' => $totalOwedToYou,
             'net_balance' => $totalOwedToYou - $totalOwed,
+            'debts' => $debts,
+            'credits' => $credits
         ];
     }
 
