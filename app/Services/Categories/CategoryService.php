@@ -44,7 +44,7 @@ class CategoryService implements CategoryServiceInterface
         
         if ($existingCategory) {
             throw ValidationException::withMessages([
-                'name' => ['Category with this name already exists'],
+                'name' => ['Категория с таким названием уже существует'],
             ]);
         }
 
@@ -63,7 +63,7 @@ class CategoryService implements CategoryServiceInterface
 
         if (!$category->isEditable()) {
             throw ValidationException::withMessages([
-                'category' => ['Default categories cannot be edited'],
+                'category' => ['Категории по умолчанию не могут быть изменены'],
             ]);
         }
 
@@ -75,7 +75,7 @@ class CategoryService implements CategoryServiceInterface
             
             if ($existingCategory) {
                 throw ValidationException::withMessages([
-                    'name' => ['Category with this name already exists'],
+                    'name' => ['Категория с таким названием уже существует'],
                 ]);
             }
         }
@@ -101,7 +101,7 @@ class CategoryService implements CategoryServiceInterface
 
         if (!$category->isDeletable()) {
             throw ValidationException::withMessages([
-                'category' => ['Category cannot be deleted'],
+                'category' => ['Категория не может быть удалена'],
             ]);
         }
 
