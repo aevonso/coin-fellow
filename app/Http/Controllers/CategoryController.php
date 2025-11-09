@@ -64,7 +64,7 @@ class CategoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Category deleted successfully',
+            'message' => 'Категория успешно удалена',
         ]);
     }
 
@@ -80,7 +80,7 @@ class CategoryController extends Controller
                 'statistics' => $stats['statistics'],
                 'recent_expenses' => $stats['recent_expenses']
             ],
-            'message' => 'Category statistics retrieved successfully'
+            'message' => 'Успешно восстановлена статистика по категориям'
         ]);
     }
 
@@ -92,7 +92,7 @@ class CategoryController extends Controller
         return response()->json([
             'success' => true,
             'data' => $stats,
-            'message' => 'User categories statistics retrieved successfully'
+            'message' => 'Успешно получена статистика по категориям пользователей'
         ]);
     }
 }

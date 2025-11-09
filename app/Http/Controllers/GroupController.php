@@ -64,7 +64,7 @@ class GroupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Group deleted successfully',
+            'message' => 'Группа успешно удалена',
         ]);
     }
 
@@ -77,7 +77,7 @@ class GroupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'User invited successfully',
+            'message' => 'Пользователь добавлен',
         ]);
     }
 
@@ -88,7 +88,7 @@ class GroupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'User removed from group',
+            'message' => 'Пользователь удален',
         ]);
     }
 
@@ -99,7 +99,7 @@ class GroupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'You have left the group',
+            'message' => 'Вы покинули группу',
         ]);
     }
 }
