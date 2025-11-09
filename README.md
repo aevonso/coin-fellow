@@ -1,4 +1,3 @@
- CoinFellow - Split Expenses Easily
 
 <div align="center">
 
@@ -7,7 +6,7 @@
 ![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)
 ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=JSON%20web%20tokens&logoColor=white)
 
-* Приложение для учета общих расходов в Telegram*
+Приложение для учета общих расходов в Telegram*
 
 </div>
 
@@ -28,7 +27,7 @@ CoinFellow - это современное Telegram Mini App для легког
 
 ---
 
-## 🛠 **Tech Stack**
+**Стек технологий**
 
 ### **Backend**
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat-square&logo=php&logoColor=white)
@@ -49,7 +48,7 @@ CoinFellow - это современное Telegram Mini App для легког
 
 ##  **Documentation**
 
-### 🔗 **API Documentation**
+**API Documentation**
 -  [Postman Collection](https://lively-astronaut-179920.postman.co/workspace/API~1fbe64a2-bdba-4aa7-b5da-cae9c1d126f2/collection/27047596-adb81a45-106a-47af-8b30-2b8fefcc59ff?action=share&source=copy-link&creator=27047596)
 
 ###  **Project Management**
