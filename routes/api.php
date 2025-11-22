@@ -76,3 +76,25 @@ Route::middleware('jwt.auth')->prefix('categories')->group(function () {
         Route::get('/statistics', [CategoryController::class, 'statistics']);
     });
 });
+
+
+//payments
+
+Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
+    // Payments
+    Route::get('payments', [PaymentController::class, 'getGroupPayments']);
+    Route::post('payments', [PaymentController::class, 'createPayment']);
+    Route::get('payments/statistics', [PaymentController::class, 'getPaymentStatistics']);
+    Route::get('payments/pending', [PaymentController::class, 'getPendingPayments']);
+    
+    Route::prefix('payments/{paymentId}')->group(function () {
+        Route::get('/', [PaymentController::class, 'getPayment']);
+        Route::put('/', [PaymentController::class, 'updatePayment']);
+        Route::delete('/', [PaymentController::class, 'deletePayment']);
+        Route::post('/confirm', [PaymentController::class, 'confirmPayment']);
+        Route::post('/reject', [PaymentController::class, 'rejectPayment']);
+    });
+});
+
+//user payments (from all groups)
+Route::middleware('jwt.auth')->get('/user/payments', [PaymentController::class, 'getUserPayments']);
