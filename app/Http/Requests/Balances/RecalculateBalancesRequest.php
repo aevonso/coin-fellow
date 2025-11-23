@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Request\Balances;
+namespace App\Http\Requests\Balances;
 
 use App\Http\Request\BaseRequest;
 
