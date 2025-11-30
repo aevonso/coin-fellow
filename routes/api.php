@@ -7,6 +7,7 @@ use App\Http\Controllers\BalanceController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\BudgetController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -113,5 +114,21 @@ Route::middleware('jwt.auth')->prefix('notifications')->group(function () {
     Route::prefix('{notificationId}')->group(function () {
         Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
         Route::delete('/', [NotificationController::class, 'destroy']);
+    });
+});
+
+//budgets routes
+Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
+    Route::get('budgets', [BudgetController::class, 'getGroupBudgets']);
+    Route::post('budgets', [BudgetController::class, 'createBudget']);
+    Route::get('budgets/overview', [BudgetController::class, 'getGroupBudgetOverview']);
+    Route::get('budgets/recommendations', [BudgetController::class, 'getBudgetRecommendations']);
+    
+    Route::prefix('budgets/{budgetId}')->group(function () {
+        Route::get('/', [BudgetController::class, 'getBudget']);
+        Route::put('/', [BudgetController::class, 'updateBudget']);
+        Route::delete('/', [BudgetController::class, 'deleteBudget']);
+        Route::get('/stats', [BudgetController::class, 'getBudgetStats']);
+        Route::get('/history', [BudgetController::class, 'getBudgetHistory']);
     });
 });
