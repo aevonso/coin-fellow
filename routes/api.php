@@ -83,7 +83,6 @@ Route::middleware('jwt.auth')->prefix('categories')->group(function () {
 //payments
 
 Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
-    // Payments
     Route::get('payments', [PaymentController::class, 'getGroupPayments']);
     Route::post('payments', [PaymentController::class, 'createPayment']);
     Route::get('payments/statistics', [PaymentController::class, 'getPaymentStatistics']);
