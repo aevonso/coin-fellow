@@ -6,6 +6,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\BalanceController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -99,3 +100,18 @@ Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
 
 //user payments (from all groups)
 Route::middleware('jwt.auth')->get('/user/payments', [PaymentController::class, 'getUserPayments']);
+
+
+//notifications routes
+Route::middleware('jwt.auth')->prefix('notifications')->group(function () {
+    Route::get('/', [NotificationController::class, 'index']);
+    Route::get('/recent', [NotificationController::class, 'recent']);
+    Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::post('/mark-multiple-read', [NotificationController::class, 'markMultipleAsRead']);
+    
+    Route::prefix('{notificationId}')->group(function () {
+        Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
+        Route::delete('/', [NotificationController::class, 'destroy']);
+    });
+});
