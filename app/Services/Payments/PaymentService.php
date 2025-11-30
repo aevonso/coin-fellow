@@ -6,6 +6,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\Group;
 use App\Services\Balances\Interfaces\BalanceServiceInterface;
+use App\Services\Notifications\Interfaces\NotificationServiceInterface;
 use App\Services\Payments\DTO\CreatePaymentDTO;
 use App\Services\Payments\DTO\UpdatePaymentDTO;
 use App\Services\Payments\Interfaces\PaymentServiceInterface;
@@ -17,7 +18,8 @@ use Illuminate\Validation\ValidationException;
 class PaymentService implements PaymentServiceInterface
 {
     public function __construct(
-        private BalanceServiceInterface $balanceService
+        private BalanceServiceInterface $balanceService,
+        private NotificationServiceInterface $notificationService
     ) {}
 
     public function getGroupPayments(User $user, string $groupId): LengthAwarePaginator
@@ -47,7 +49,6 @@ class PaymentService implements PaymentServiceInterface
             ]);
         }
 
-        
         if ($user->id !== $dto->fromUserId) {
             throw ValidationException::withMessages([
                 'from_user_id' => ['Вы можете создавать платежи только от себя'],
@@ -62,7 +63,7 @@ class PaymentService implements PaymentServiceInterface
             ]);
         }
 
-        return DB::transaction(function () use ($dto) {
+        return DB::transaction(function () use ($dto, $user, $group) {
             $payment = Payment::create([
                 'group_id' => $dto->groupId,
                 'from_user_id' => $dto->fromUserId,
@@ -73,6 +74,8 @@ class PaymentService implements PaymentServiceInterface
                 'status' => Payment::STATUS_PENDING,
             ]);
 
+            $this->notifyPaymentRequest($payment, $user);
+
             return $payment->load(['fromUser', 'toUser', 'group']);
         });
     }
@@ -82,7 +85,6 @@ class PaymentService implements PaymentServiceInterface
         $payment = Payment::with(['fromUser', 'toUser', 'group.users'])
             ->findOrFail($paymentId);
 
-      
         if (!$payment->group->users->contains($user->id)) {
             throw ValidationException::withMessages([
                 'payment' => ['Вы не являетесь участником этой платежной группы'],
@@ -98,7 +100,6 @@ class PaymentService implements PaymentServiceInterface
 
         $this->checkPaymentPermissions($user, $payment);
 
-        
         if (!$payment->isPending()) {
             throw ValidationException::withMessages([
                 'payment' => ['Могут быть обновлены только отложенные платежи'],
@@ -120,7 +121,6 @@ class PaymentService implements PaymentServiceInterface
 
         $this->checkPaymentPermissions($user, $payment);
 
-       
         if (!$payment->isPending()) {
             throw ValidationException::withMessages([
                 'payment' => ['Можно удалить только отложенные платежи'],
@@ -132,9 +132,8 @@ class PaymentService implements PaymentServiceInterface
 
     public function confirmPayment(User $user, string $paymentId): Payment
     {
-        $payment = Payment::with(['group'])->findOrFail($paymentId);
+        $payment = Payment::with(['group', 'fromUser'])->findOrFail($paymentId);
 
-        
         if ($user->id !== $payment->to_user_id) {
             throw ValidationException::withMessages([
                 'payment' => ['Подтвердить платеж может только получатель платежа'],
@@ -147,12 +146,13 @@ class PaymentService implements PaymentServiceInterface
             ]);
         }
 
-        return DB::transaction(function () use ($payment) {
+        return DB::transaction(function () use ($payment, $user) {
             $payment->status = Payment::STATUS_CONFIRMED;
             $payment->save();
 
-        
-            $this->settlePayment($payment);
+            $this->balanceService->calculateBalancesForGroup($payment->group_id);
+
+            $this->notifyPaymentConfirmed($payment, $user);
 
             return $payment->load(['fromUser', 'toUser', 'group']);
         });
@@ -160,9 +160,8 @@ class PaymentService implements PaymentServiceInterface
 
     public function rejectPayment(User $user, string $paymentId): Payment
     {
-        $payment = Payment::with(['group'])->findOrFail($paymentId);
+        $payment = Payment::with(['group', 'fromUser'])->findOrFail($paymentId);
 
-        
         if ($user->id !== $payment->to_user_id) {
             throw ValidationException::withMessages([
                 'payment' => ['Отклонить платеж может только получатель платежа'],
@@ -177,6 +176,8 @@ class PaymentService implements PaymentServiceInterface
 
         $payment->status = Payment::STATUS_REJECTED;
         $payment->save();
+
+        $this->notifyPaymentRejected($payment, $user);
 
         return $payment->load(['fromUser', 'toUser', 'group']);
     }
@@ -242,7 +243,6 @@ class PaymentService implements PaymentServiceInterface
     {
         $payment = Payment::findOrFail($paymentId);
 
-        // Проверяем права
         if ($user->id !== $payment->to_user_id) {
             throw ValidationException::withMessages([
                 'payment' => ['Только получатель платежа может произвести оплату'],
@@ -254,7 +254,6 @@ class PaymentService implements PaymentServiceInterface
                 'payment' => ['Могут быть произведены только подтвержденные платежи'],
             ]);
         }
-
 
         $this->balanceService->calculateBalancesForGroup($payment->group_id);
     }
@@ -279,5 +278,53 @@ class PaymentService implements PaymentServiceInterface
                 'permission' => ['У вас нет разрешения на изменение этого платежа'],
             ]);
         }
+    }
+
+    private function notifyPaymentRequest(Payment $payment, User $fromUser): void
+    {
+        $this->notificationService->notifyPaymentRequest($payment->toUser, [
+            'payment_id' => $payment->id,
+            'amount' => $payment->amount,
+            'from_user_id' => $fromUser->id,
+            'from_user_name' => $fromUser->first_name ?? $fromUser->username,
+            'to_user_id' => $payment->to_user_id,
+            'group_id' => $payment->group_id,
+            'group_name' => $payment->group->name,
+            'notes' => $payment->notes,
+            'date' => $payment->date->format('Y-m-d'),
+        ]);
+    }
+
+    private function notifyPaymentConfirmed(Payment $payment, User $confirmer): void
+    {
+        $this->notificationService->notifyPaymentConfirmed($payment->fromUser, [
+            'payment_id' => $payment->id,
+            'amount' => $payment->amount,
+            'from_user_id' => $payment->from_user_id,
+            'to_user_id' => $confirmer->id,
+            'to_user_name' => $confirmer->first_name ?? $confirmer->username,
+            'group_id' => $payment->group_id,
+            'group_name' => $payment->group->name,
+            'confirmed_at' => now()->toISOString(),
+        ]);
+    }
+
+    private function notifyPaymentRejected(Payment $payment, User $rejecter): void
+    {
+        $this->notificationService->createNotification(
+            new \App\Services\Notifications\DTO\CreateNotificationDTO(
+                userId: $payment->from_user_id,
+                type: \App\Models\Notification::TYPE_PAYMENT_REQUEST,
+                message: "Платеж отклонен: {$payment->amount}₽ получателем {$rejecter->first_name}",
+                groupId: $payment->group_id,
+                data: [
+                    'payment_id' => $payment->id,
+                    'amount' => $payment->amount,
+                    'rejecter_name' => $rejecter->first_name ?? $rejecter->username,
+                    'group_id' => $payment->group_id,
+                    'action' => 'rejected',
+                ]
+            )
+        );
     }
 }
