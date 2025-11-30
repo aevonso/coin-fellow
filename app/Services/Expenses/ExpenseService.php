@@ -6,6 +6,7 @@ use App\Models\Expense;
 use App\Models\User;
 use App\Models\Group;
 use App\Services\Balances\Interfaces\BalanceServiceInterface;
+use App\Services\Notifications\Interfaces\NotificationServiceInterface;
 use App\Services\Expenses\DTO\CreateExpenseDTO;
 use App\Services\Expenses\DTO\UpdateExpenseDTO;
 use App\Services\Expenses\Interfaces\ExpenseServiceInterface;
@@ -16,8 +17,10 @@ use Illuminate\Validation\ValidationException;
 class ExpenseService implements ExpenseServiceInterface {
 
     public function __construct (
-        private BalanceServiceInterface $balanceService
+        private BalanceServiceInterface $balanceService,
+        private NotificationServiceInterface $notificationService
     ) {}
+
     public function getGroupExpenses(User $user, string $groupId): LengthAwarePaginator {
         $group = Group::findOrFail($groupId); 
 
@@ -35,13 +38,14 @@ class ExpenseService implements ExpenseServiceInterface {
     }
 
     public function createExpense(User $user, CreateExpenseDTO $dto): Expense {
-        $group = Group::findOrFail($dto->groupId);
+        $group = Group::with('users')->findOrFail($dto->groupId);
 
         if(!$group->users->contains($user->id)) {
             throw ValidationException::withMessages([
                 'group' => ['Вы не являетесь участником этой группы'],
             ]);
         }
+
         return DB::transaction(function() use ($user, $dto, $group) {
             $expense = Expense::create([
                 'group_id' => $dto->groupId,
@@ -54,8 +58,9 @@ class ExpenseService implements ExpenseServiceInterface {
 
             $this->handleParticipants($expense, $dto->participants, $group);
             
-            //Автоматический расчет балансов после создания расхода
-            $this->balanceService->calculateBalanceForGroup($dto->groupId);
+            $this->balanceService->calculateBalancesForGroup($dto->groupId);
+
+            $this->notifyExpenseCreated($expense, $user, $group);
 
             return $expense->load(['payer', 'category' , 'participants']);
         });  
@@ -69,7 +74,7 @@ class ExpenseService implements ExpenseServiceInterface {
 
         if (empty($participants)) {
             throw ValidationException::withMessages([
-                'participants' => ['No participants found for this expense'],
+                'participants' => ['Участников для оплаты этого счета не найдено'],
             ]);
         }
 
@@ -100,11 +105,13 @@ class ExpenseService implements ExpenseServiceInterface {
 
     public function updateExpense(User $user, string $expenseId, UpdateExpenseDTO $dto): Expense
     {
-        $expense = Expense::with(['group'])->findOrFail($expenseId);
+        $expense = Expense::with(['group.users'])->findOrFail($expenseId);
 
         $this->checkExpensePermissions($user, $expense);
 
-        return DB::transaction(function () use ($expense, $dto) {
+        return DB::transaction(function () use ($expense, $dto, $user) {
+            $oldAmount = $expense->amount;
+            
             if ($dto->description) {
                 $expense->description = $dto->description;
             }
@@ -125,19 +132,25 @@ class ExpenseService implements ExpenseServiceInterface {
             }
 
             $this->balanceService->calculateBalancesForGroup($expense->group_id);
+
+            if ($dto->amount && $dto->amount != $oldAmount) {
+                $this->notifyExpenseUpdated($expense, $user);
+            }
+
             return $expense->load(['payer', 'category', 'participants']);
         });
-
-        
     }
 
     public function deleteExpense(User $user, string $expenseId): void
     {
-        $expense = Expense::with(['group'])->findOrFail($expenseId);
+        $expense = Expense::with(['group.users'])->findOrFail($expenseId);
+        $groupId = $expense->group_id;
 
         $this->checkExpensePermissions($user, $expense);
 
-        DB::transaction(function () use ($expense, $groupId){
+        DB::transaction(function () use ($expense, $groupId, $user) {
+            $this->notifyExpenseDeleted($expense, $user);
+            
             $expense->delete();
 
             $this->balanceService->calculateBalancesForGroup($groupId);
@@ -164,6 +177,72 @@ class ExpenseService implements ExpenseServiceInterface {
             throw ValidationException::withMessages([
                 'permission' => ['У вас нет разрешения на изменение этого расхода'],
             ]);
+        }
+    }
+
+    private function notifyExpenseCreated(Expense $expense, User $creator, Group $group): void
+    {
+        $participants = $group->users->where('id', '!=', $creator->id);
+        
+        foreach ($participants as $participant) {
+            $this->notificationService->notifyNewExpense($participant, [
+                'expense_id' => $expense->id,
+                'description' => $expense->description,
+                'amount' => $expense->amount,
+                'payer_name' => $creator->first_name ?? $creator->username,
+                'group_id' => $expense->group_id,
+                'group_name' => $group->name,
+                'category_name' => $expense->category?->name,
+                'date' => $expense->date->format('Y-m-d'),
+            ]);
+        }
+    }
+
+    private function notifyExpenseUpdated(Expense $expense, User $editor): void
+    {
+        $participants = $expense->group->users->where('id', '!=', $editor->id);
+        
+        foreach ($participants as $participant) {
+            $this->notificationService->createNotification(
+                new \App\Services\Notifications\DTO\CreateNotificationDTO(
+                    userId: $participant->id,
+                    type: \App\Models\Notification::TYPE_NEW_EXPENSE,
+                    message: "Расход обновлен: {$expense->description} - {$expense->amount}₽",
+                    groupId: $expense->group_id,
+                    data: [
+                        'expense_id' => $expense->id,
+                        'description' => $expense->description,
+                        'amount' => $expense->amount,
+                        'editor_name' => $editor->first_name ?? $editor->username,
+                        'group_id' => $expense->group_id,
+                        'action' => 'updated',
+                    ]
+                )
+            );
+        }
+    }
+
+    private function notifyExpenseDeleted(Expense $expense, User $deleter): void
+    {
+        $participants = $expense->group->users->where('id', '!=', $deleter->id);
+        
+        foreach ($participants as $participant) {
+            $this->notificationService->createNotification(
+                new \App\Services\Notifications\DTO\CreateNotificationDTO(
+                    userId: $participant->id,
+                    type: \App\Models\Notification::TYPE_NEW_EXPENSE,
+                    message: "Расход удален: {$expense->description} - {$expense->amount}₽",
+                    groupId: $expense->group_id,
+                    data: [
+                        'expense_id' => $expense->id,
+                        'description' => $expense->description,
+                        'amount' => $expense->amount,
+                        'deleter_name' => $deleter->first_name ?? $deleter->username,
+                        'group_id' => $expense->group_id,
+                        'action' => 'deleted',
+                    ]
+                )
+            );
         }
     }
 }

@@ -4,16 +4,23 @@ namespace App\Services\Groups;
 
 use App\Models\Group;
 use App\Models\User;
+use App\Models\Invitation;
+use App\Services\Notifications\Interfaces\NotificationServiceInterface;
 use App\Services\Groups\DTO\CreateGroupDTO;
 use App\Services\Groups\DTO\UpdateGroupDTO;
 use App\Services\Groups\DTO\InviteUserDTO;
 use App\Services\Groups\Interfaces\GroupServiceInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class GroupService implements GroupServiceInterface 
 {
+    public function __construct(
+        private NotificationServiceInterface $notificationService
+    ) {}
+
     public function getUserGroups(User $user): LengthAwarePaginator 
     {
         return $user->groups()
@@ -32,7 +39,6 @@ class GroupService implements GroupServiceInterface
             'invite_code' => Str::random(10),
         ]);
 
-        
         $group->users()->attach($user->id, ['role' => 'owner']);
 
         return $group->load('users');
@@ -45,7 +51,7 @@ class GroupService implements GroupServiceInterface
 
         if (!$group->users->contains($user->id)) {
             throw ValidationException::withMessages([
-                'group' => ['You are not a member of this group'],
+                'group' => ['Вы не являетесь членом этой группы'],
             ]);
         }
 
@@ -76,7 +82,6 @@ class GroupService implements GroupServiceInterface
     {
         $group = Group::findOrFail($groupId);
 
-
         $this->checkUserPermissions($user, $group, ['owner']);
 
         $group->delete();
@@ -88,38 +93,36 @@ class GroupService implements GroupServiceInterface
 
         $this->checkUserPermissions($user, $group, ['owner', 'admin']);
 
-
         $invitedUser = User::where('email', $dto->email_or_username)
             ->orWhere('username', $dto->email_or_username)
             ->first();
 
         if (!$invitedUser) {
             throw ValidationException::withMessages([
-                'email_or_username' => ['User not found'],
+                'email_or_username' => ['Пользователь не найден'],
             ]);
         }
 
         if ($group->users->contains($invitedUser->id)) {
             throw ValidationException::withMessages([
-                'email_or_username' => ['User is already in the group'],
+                'email_or_username' => ['Пользователь уже находится в группе'],
             ]);
         }
 
-        // Исправлено: 'member' вместо 'members'
         $group->users()->attach($invitedUser->id, ['role' => $dto->role ?? 'member']);
+
+        $this->notifyInvitation($invitedUser, $user, $group);
     }
 
     public function removeUser(User $user, string $groupId, string $userId): void
     {
         $group = Group::findOrFail($groupId);
 
-        // Проверяем права (только owner/admin могут удалять)
         $this->checkUserPermissions($user, $group, ['owner', 'admin']);
 
-        // Нельзя удалить самого себя
         if ($user->id === $userId) {
             throw ValidationException::withMessages([
-                'user' => ['You cannot remove yourself from the group'],
+                'user' => ['Вы не можете самостоятельно удалиться из группы'],
             ]);
         }
 
@@ -130,12 +133,11 @@ class GroupService implements GroupServiceInterface
     {
         $group = Group::findOrFail($groupId);
 
-        // Владелец не может покинуть, пусть передает права 
         $userRole = $group->users()->where('user_id', $user->id)->first()->pivot->role;
         
         if ($userRole === 'owner') {
             throw ValidationException::withMessages([
-                'group' => ['Owner cannot leave the group. Transfer ownership or delete the group.'],
+                'group' => ['Владелец не может покинуть группу. Передайте права собственности или удалите группу'],
             ]);
         }
 
@@ -148,8 +150,18 @@ class GroupService implements GroupServiceInterface
         
         if (!$userRole || !in_array($userRole, $allowedRoles)) {
             throw ValidationException::withMessages([
-                'permission' => ['You do not have permission to perform this action'],
+                'permission' => ['У вас нет разрешения на выполнение этого действия'],
             ]);
         }
+    }
+
+    private function notifyInvitation(User $invitedUser, User $inviter, Group $group): void
+    {
+        $this->notificationService->notifyInvitation($invitedUser, [
+            'group_id' => $group->id,
+            'group_name' => $group->name,
+            'inviter_name' => $inviter->first_name ?? $inviter->username,
+            'invited_user_id' => $invitedUser->id,
+        ]);
     }
 }
