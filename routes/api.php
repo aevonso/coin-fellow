@@ -9,6 +9,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BudgetController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AnalyticsController;
 
 
 
@@ -131,4 +132,23 @@ Route::middleware('jwt.auth')->prefix('groups/{groupId}')->group(function () {
         Route::get('/stats', [BudgetController::class, 'getBudgetStats']);
         Route::get('/history', [BudgetController::class, 'getBudgetHistory']);
     });
+});
+
+//analytics 
+Route::middleware('jwt.auth')->prefix('analytics')->group(function () {
+    Route::prefix('groups/{groupId}')->group(function () {
+        Route::get('/spending-trend', [AnalyticsController::class, 'getSpendingTrend']);
+        Route::get('/category-breakdown', [AnalyticsController::class, 'getCategoryBreakdown']);
+        Route::get('/user-comparison', [AnalyticsController::class, 'getUserSpendingComparison']);
+        Route::get('/expense-distribution', [AnalyticsController::class, 'getExpenseDistribution']);
+        Route::get('/top-categories', [AnalyticsController::class, 'getTopSpendingCategories']);
+        Route::get('/user-stats', [AnalyticsController::class, 'getUserSpendingStats']);
+        Route::get('/period-comparison', [AnalyticsController::class, 'getPeriodComparison']);
+        Route::get('/savings-opportunities', [AnalyticsController::class, 'getSavingsOpportunities']);
+        Route::get('/spending-predictions', [AnalyticsController::class, 'getSpendingPredictions']);
+        Route::get('/dashboard', [AnalyticsController::class, 'getGroupAnalyticsDashboard']);
+        Route::get('/report', [AnalyticsController::class, 'generateReport']);
+    });
+    
+    Route::get('/user-dashboard', [AnalyticsController::class, 'getUserAnalyticsDashboard']);
 });
