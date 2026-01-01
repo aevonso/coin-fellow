@@ -83,7 +83,7 @@ class RecurringExpenseService implements RecurringExpenseServiceInterface
             return $recurringExpense->load(['payer', 'category', 'group']);
         });
     }
-
+    //получение постоянных трат
     public function getRecurringExpense(User $user, string $recurringExpenseId): RecurringExpense
     {
         $recurringExpense = RecurringExpense::with(['payer', 'category', 'group.users'])
