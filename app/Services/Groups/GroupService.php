@@ -87,32 +87,57 @@ class GroupService implements GroupServiceInterface
         $group->delete();
     }
 
-    public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): void 
-    {
-        $group = Group::findOrFail($groupId);
+public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): void 
+{
+    \Log::info('=== INVITE USER DEBUG START ===');
+    \Log::info('Search term:', [$dto->email_or_username]);
+    \Log::info('Group ID:', [$groupId]);
+    \Log::info('Inviter ID:', [$user->id]);
+    
+    $group = Group::findOrFail($groupId);
+    \Log::info('Group found:', [$group->id, $group->name]);
 
-        $this->checkUserPermissions($user, $group, ['owner', 'admin']);
+    $this->checkUserPermissions($user, $group, ['owner', 'admin']);
 
-        $invitedUser = User::where('email', $dto->email_or_username)
-            ->orWhere('username', $dto->email_or_username)
-            ->first();
+    //search user
+    $invitedUser = User::where('email', $dto->email_or_username)
+        ->orWhere('username', $dto->email_or_username)
+        ->orWhere('phone', $dto->email_or_username)
+        ->first();
 
-        if (!$invitedUser) {
-            throw ValidationException::withMessages([
-                'email_or_username' => ['Пользователь не найден'],
-            ]);
-        }
+    \Log::info('User search result:', [
+        'found' => $invitedUser ? 'YES' : 'NO',
+        'user_id' => $invitedUser ? $invitedUser->id : null,
+        'username' => $invitedUser ? $invitedUser->username : null,
+        'email' => $invitedUser ? $invitedUser->email : null,
+        'phone' => $invitedUser ? $invitedUser->phone : null
+    ]);
 
-        if ($group->users->contains($invitedUser->id)) {
-            throw ValidationException::withMessages([
-                'email_or_username' => ['Пользователь уже находится в группе'],
-            ]);
-        }
-
-        $group->users()->attach($invitedUser->id, ['role' => $dto->role ?? 'member']);
-
-        $this->notifyInvitation($invitedUser, $user, $group);
+    if (!$invitedUser) {
+        \Log::info('ERROR: User not found');
+        throw ValidationException::withMessages([
+            'email_or_username' => ['Пользователь не найден'],
+        ]);
     }
+
+    //проверка на участие в группе
+    $alreadyMember = $group->users()->where('user_id', $invitedUser->id)->exists();
+    \Log::info('Already in group?:', [$alreadyMember ? 'YES' : 'NO']);
+
+    if ($alreadyMember) {
+        \Log::info('ERROR: User already in group');
+        throw ValidationException::withMessages([
+            'email_or_username' => ['Пользователь уже находится в группе'],
+        ]);
+    }
+
+    //invite
+    $group->users()->attach($invitedUser->id, ['role' => $dto->role ?? 'member']);
+    \Log::info('SUCCESS: User added to group');
+    \Log::info('=== INVITE USER DEBUG END ===');
+
+    $this->notifyInvitation($invitedUser, $user, $group);
+}
 
     public function removeUser(User $user, string $groupId, string $userId): void
     {

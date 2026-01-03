@@ -20,8 +20,14 @@ class Group extends Model
     ];
 
     public function users(): BelongsToMany {
+        return $this->members();
+    }
+
+    public function members(): BelongsToMany 
+    {
         return $this->belongsToMany(User::class, 'group_user')
-            ->withPivot('role')
+            ->using(GroupUser::class)
+            ->withPivot('role', 'created_at', 'updated_at')
             ->withTimestamps();
     }
 
@@ -30,7 +36,25 @@ class Group extends Model
         return $this->hasMany(Expense::class);
     }
 
-     public function scopeWhereUserIsMember($query, User $user)
+    public function groupUsers(): HasMany {
+        return $this->hasMany(GroupUser::class);
+    }
+
+    public function getOwner(): ?GroupUser 
+    {
+        return $this->groupUsers()->where('role', 'owner')->first();
+    }
+
+    public function getAdmins() 
+    {
+        return $this->groupUsers()->whereIn('role', ['owner', 'admin'])->get();
+    }
+
+    public function getMembers(){
+        $this->groupUsers()->where('role', 'member')->get();
+    } 
+
+    public function scopeWhereUserIsMember($query, User $user)
     {
         return $query->whereHas('users', function ($q) use ($user) {
             $q->where('user_id', $user->id);
@@ -39,15 +63,12 @@ class Group extends Model
 
     public function scopeWithUserRole($query, User $user)
     {
-        return $query->with(['users' => function ($query) use ($user) {
-            $query->where('user_id', $user->id)->select('role');
+        return $query->with(['groupUsers' => function ($query) use ($user) {
+            $query->where('user_id', $user->id);
         }]);
     }
 
-    public function getOwner(): ?User
-    {
-        return $this->users()->wherePivot('role', 'owner')->first();
-    }
+   
 
     public function isUserOwner(User $user): bool
     {
@@ -59,9 +80,9 @@ class Group extends Model
 
     public function isUserAdmin(User $user): bool
     {
-        return $this->users()
+        return $this->groupUsers()
             ->where('user_id', $user->id)
-            ->whereIn('group_user.role', ['owner', 'admin'])
+            ->whereIn('role', ['owner', 'admin'])
             ->exists();
     }
 
@@ -70,13 +91,12 @@ class Group extends Model
         return $this->users()
             ->where('user_id', $user->id)
             ->first()
-            ?->pivot
-            ->role ?? null;
+            ?->role;
     }
 
     public function getMembersCount(): int
     {
-        return $this->users()->count();
+        return $this->groupUsers()->count();
     }
 
     public function getTotalExpenses(): float
