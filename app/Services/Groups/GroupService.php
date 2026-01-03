@@ -39,9 +39,13 @@ class GroupService implements GroupServiceInterface
             'invite_code' => Str::random(10),
         ]);
 
-        $group->users()->attach($user->id, ['role' => 'owner']);
+        GroupUser::create([
+            'group_id' => $group->id,
+            'user_id' => $user->id,
+            'role' => 'owner',
+        ]);
 
-        return $group->load('users');
+        return $group->load('members');
     }
 
     public function getGroup(User $user, string $groupId): Group 
@@ -49,7 +53,7 @@ class GroupService implements GroupServiceInterface
         $group = Group::with(['users', 'expenses.payer', 'expenses.category'])
             ->findOrFail($groupId);
 
-        if (!$group->users->contains($user->id)) {
+        if(!$group->groupUsers()->where('user_id', $user->id)->exists()) {
             throw ValidationException::withMessages([
                 'group' => ['Вы не являетесь членом этой группы'],
             ]);
@@ -75,7 +79,7 @@ class GroupService implements GroupServiceInterface
         }
 
         $group->save();
-        return $group->load('users');
+        return $group->load('members');
     }
 
     public function deleteGroup(User $user, string $groupId): void 
@@ -87,57 +91,42 @@ class GroupService implements GroupServiceInterface
         $group->delete();
     }
 
-public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): void 
-{
-    \Log::info('=== INVITE USER DEBUG START ===');
-    \Log::info('Search term:', [$dto->email_or_username]);
-    \Log::info('Group ID:', [$groupId]);
-    \Log::info('Inviter ID:', [$user->id]);
-    
-    $group = Group::findOrFail($groupId);
-    \Log::info('Group found:', [$group->id, $group->name]);
+    public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): void 
+    {
+        $group = Group::findOrFail($groupId);
 
-    $this->checkUserPermissions($user, $group, ['owner', 'admin']);
+        $this->checkUserPermissions($user, $group, ['owner', 'admin']);
 
-    //search user
-    $invitedUser = User::where('email', $dto->email_or_username)
-        ->orWhere('username', $dto->email_or_username)
-        ->orWhere('phone', $dto->email_or_username)
-        ->first();
+        $invitedUser = User::where('email', $dto->email_or_username)
+            ->orWhere('username', $dto->email_or_username)
+            ->orWhere('phone', $dto->email_or_username)
+            ->first();
 
-    \Log::info('User search result:', [
-        'found' => $invitedUser ? 'YES' : 'NO',
-        'user_id' => $invitedUser ? $invitedUser->id : null,
-        'username' => $invitedUser ? $invitedUser->username : null,
-        'email' => $invitedUser ? $invitedUser->email : null,
-        'phone' => $invitedUser ? $invitedUser->phone : null
-    ]);
+        if(!$invitedUser) {
+            throw ValidationException::withMessages([
+                'email_or_username' => ['Пользователь не найден'],
+            ]);
+        }
 
-    if (!$invitedUser) {
-        \Log::info('ERROR: User not found');
-        throw ValidationException::withMessages([
-            'email_or_username' => ['Пользователь не найден'],
+        $existingMembers = GroupUser::where('group_id', $group->id)
+            ->where('user_id', $invitedUser->id)
+            ->exists();
+            
+        if($existingMembers) {
+            throw ValidationException::withMessages([
+                'email_or_username' => ['Пользователь уже находится в группе'],
+            ]);
+        }
+
+        GroupUser::create([
+            'group_id' => $group->id,
+            'user_id' => $invitedUser->id,
+            'role' => $dto->role ?? 'member',
         ]);
+
+        $this->notifyInvitation($invitedUser, $user, $group);
     }
 
-    //проверка на участие в группе
-    $alreadyMember = $group->users()->where('user_id', $invitedUser->id)->exists();
-    \Log::info('Already in group?:', [$alreadyMember ? 'YES' : 'NO']);
-
-    if ($alreadyMember) {
-        \Log::info('ERROR: User already in group');
-        throw ValidationException::withMessages([
-            'email_or_username' => ['Пользователь уже находится в группе'],
-        ]);
-    }
-
-    //invite
-    $group->users()->attach($invitedUser->id, ['role' => $dto->role ?? 'member']);
-    \Log::info('SUCCESS: User added to group');
-    \Log::info('=== INVITE USER DEBUG END ===');
-
-    $this->notifyInvitation($invitedUser, $user, $group);
-}
 
     public function removeUser(User $user, string $groupId, string $userId): void
     {
@@ -151,31 +140,37 @@ public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): voi
             ]);
         }
 
-        $group->users()->detach($userId);
+        GroupUser::where('group_id', $group->id)
+            ->where('user_id', $userId)
+            ->delete();
     }
 
     public function leaveGroup(User $user, string $groupId): void
     {
         $group = Group::findOrFail($groupId);
 
-        $userRole = $group->users()->where('user_id', $user->id)->first()->pivot->role;
-        
-        if ($userRole === 'owner') {
+        $groupUser = GroupUser::where('group_id', $group->id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        if($groupUser->role === 'owner') {
             throw ValidationException::withMessages([
-                'group' => ['Владелец не может покинуть группу. Передайте права собственности или удалите группу'],
+                'group' => ['Владелец не может группу. Передайте права или удалите группу'],
             ]);
         }
 
-        $group->users()->detach($user->id);
+        $groupUser->delete();
     }
 
     private function checkUserPermissions(User $user, Group $group, array $allowedRoles): void
     {
-        $userRole = $group->users()->where('user_id', $user->id)->first()->pivot->role ?? null;
-        
-        if (!$userRole || !in_array($userRole, $allowedRoles)) {
+        $groupUser = GroupUser::Where('group_id', $group->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if(!$groupUser || in_array($groupUser->role, $allowedRoles)) {
             throw ValidationException::withMessages([
-                'permission' => ['У вас нет разрешения на выполнение этого действия'],
+                'permission' => ['У вас нет разрещения для выполнения этого действия'],
             ]);
         }
     }
@@ -188,5 +183,49 @@ public function inviteUser(User $user, string $groupId, InviteUserDTO $dto): voi
             'inviter_name' => $inviter->first_name ?? $inviter->username,
             'invited_user_id' => $invitedUser->id,
         ]);
+    }
+
+    public function getUserRoleInGroup(User $user, Group $group): ?string 
+    {
+        $groupUser = GroupUser::where('group_id', $group->id)
+            ->where('user_id', $user->id)
+            ->first();
+        
+        return $groupUser?->role;
+    }
+
+    //функция для передачи прав собственности
+
+    public function transferOwnership(User $currentOwner, string $groupId, string $newOwnerId): void 
+    {
+        $group = Group::firstOrFail($groupId);
+
+        //проверка, что текущий юзер - смотрящий
+        $currentGroupOwner = GroupUser::where('group_id', $group->id)
+            ->where('user_id', $currentOwner->id)
+            ->where('role', 'owner')
+            ->firstOrFail();
+
+        //чекаем, что новый смотрящий находится в группе
+        $newOwnerGroupUser = GroupUser::where('group_id', $group->id)
+            ->where('user_id', $newOwnerId)
+            ->first();
+
+        if(!$newOwnerGroupUser) {
+            throw ValidationException::withMessages([
+                'user' => ['Пользователь не состоит в группе'],
+            ]);
+        }
+
+        DB::transaction(function () use ($group, $currentOwner, $newOwnerId) {
+            //старый смотрящий в красные переходит
+            GroupUser::where('group_id', $group->id)
+                ->where('user_id', $currentOwner->id)
+                ->update(['role'=> 'admin']);
+
+            GroupUser::where('group_id', $group->id)
+                ->where('user_id', $newOwnerId)
+                ->update(['role' => 'owner']);
+        });
     }
 }
