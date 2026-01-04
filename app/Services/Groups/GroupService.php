@@ -162,18 +162,19 @@ class GroupService implements GroupServiceInterface
         $groupUser->delete();
     }
 
-    private function checkUserPermissions(User $user, Group $group, array $allowedRoles): void
-    {
-        $groupUser = GroupUser::Where('group_id', $group->id)
-            ->where('user_id', $user->id)
-            ->first();
+   private function checkUserPermissions(User $user, Group $group, array $allowedRoles): void
+{
+    $groupUser = GroupUser::where('group_id', $group->id) 
+        ->where('user_id', $user->id)
+        ->first();
 
-        if(!$groupUser || in_array($groupUser->role, $allowedRoles)) {
-            throw ValidationException::withMessages([
-                'permission' => ['У вас нет разрещения для выполнения этого действия'],
-            ]);
-        }
+   
+    if (!$groupUser || !in_array($groupUser->role, $allowedRoles)) {
+        throw ValidationException::withMessages([
+            'permission' => ['У вас нет разрешения на выполнение этого действия'],
+        ]);
     }
+}
 
     private function notifyInvitation(User $invitedUser, User $inviter, Group $group): void
     {

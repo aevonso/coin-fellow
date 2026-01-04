@@ -51,7 +51,7 @@ class Group extends Model
     }
 
     public function getMembers(){
-        $this->groupUsers()->where('role', 'member')->get();
+        return $this->groupUsers()->where('role', 'member')->get();
     } 
 
     public function scopeWhereUserIsMember($query, User $user)
